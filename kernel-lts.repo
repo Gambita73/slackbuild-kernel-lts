@@ -1,0 +1,6 @@
+# sbopkg repository descriptor for the kernel-lts SlackBuild.
+# Install it with:
+#   cp kernel-lts.repo /etc/sbopkg/repos.d/70-kernel-lts.repo
+# Fields: Repo Branch Description Tag Tool Link CheckGPG
+kernel-lts 15.0 "Linux 6.1 LTS kernel for Slackware 15.0" _lts git https://github.com/Gambita73/slackbuild-kernel-lts.git@main ""
+

@@ -1,0 +1,73 @@
+kernel-lts (Linux 6.1 longterm kernel for Slackware 15.0)
+
+This builds a Linux 6.1.y longterm kernel plus its modules as one
+package. It starts from Slackware's own 5.15 "generic" kernel config
+(the newest /boot/config-generic-5.15.* on the build machine) and fills
+in options that are new since 5.15 with upstream defaults
+("make olddefconfig").
+
+It installs next to the stock kernel and never overwrites it:
+
+  /boot/vmlinuz-lts-<version>      plus the symlink /boot/vmlinuz-lts
+  /boot/System.map-lts-<version>   plus the symlink /boot/System.map-lts
+  /boot/config-lts-<version>       plus the symlink /boot/config-lts
+  /lib/modules/<version>/
+
+Keep kernel-generic/kernel-modules installed as a fallback, and do NOT
+replace kernel-headers: glibc and the rest of Slackware 15.0 were built
+against the 5.15 headers.
+
+Building takes a long time (from 30 minutes to several hours) and needs
+about 8 GB free in $TMP (/tmp/SBo by default).
+
+Options (set them in the environment):
+
+  CONFIG=/path/to/config   start from this config instead
+  SOURCE=yes               also package the source tree, needed to build
+                           out-of-tree modules such as nvidia-kernel or
+                           VirtualBox (adds about 1.2 GB)
+  DEBUG=yes                keep debug info/BTF (off by default)
+  JOBS=N                   parallel make jobs (default: all CPUs)
+
+Example:
+  SOURCE=yes sbopkg -V kernel-lts/15.0 -i kernel-lts
+
+AFTER EVERY INSTALL OR UPGRADE
+
+Like kernel-generic, this kernel needs an initrd, and the initrd holds
+modules for one exact kernel version, so rebuild it each time the
+package is upgraded (replace <version> with the new version):
+
+  /usr/share/mkinitrd/mkinitrd_command_generator.sh -k <version> \
+      -a "-o /boot/initrd-lts.gz" | bash
+
+Then update the bootloader.
+
+lilo: add this once to /etc/lilo.conf, then run "lilo" after every
+upgrade:
+
+  image = /boot/vmlinuz-lts
+    initrd = /boot/initrd-lts.gz
+    root = /dev/sdXN
+    label = Linux-LTS
+    read-only
+
+elilo (UEFI): copy the kernel and initrd to the EFI partition after
+every upgrade:
+
+  cp /boot/vmlinuz-lts /boot/efi/EFI/Slackware/vmlinuz-lts
+  cp /boot/initrd-lts.gz /boot/efi/EFI/Slackware/initrd-lts.gz
+
+and add this once to /boot/efi/EFI/Slackware/elilo.conf:
+
+  image=vmlinuz-lts
+    label=lts
+    initrd=initrd-lts.gz
+    read-only
+    append="root=/dev/sdXN vga=normal ro"
+
+GRUB: run "grub-mkconfig -o /boot/grub/grub.cfg" after every upgrade,
+and check that the vmlinuz-lts entry has an initrd-lts.gz line.
+
+Upgrading the package removes the modules of the previous 6.1 version,
+so reboot into the new one soon after upgrading.

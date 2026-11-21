@@ -1,0 +1,19 @@
+# HOW TO EDIT THIS FILE:
+# The "handy ruler" below makes it easier to edit a package description.
+# Line up the first '|' above the ':' following the base package name, and
+# the '|' on the right side marks the last column you can put a character in.
+# You must make exactly 11 lines for the formatting to be correct.  It's also
+# customary to leave one space after the ':' except on otherwise blank lines.
+
+          |-----handy-ruler------------------------------------------------------|
+kernel-lts: kernel-lts (Linux 6.1 longterm kernel for Slackware 15.0)
+kernel-lts:
+kernel-lts: A Linux 6.1.y longterm (LTS) kernel and its modules, built from
+kernel-lts: Slackware's own 5.15 "generic" config. It installs next to the
+kernel-lts: stock kernel as /boot/vmlinuz-lts-<version> and does not replace
+kernel-lts: kernel-generic, kernel-modules or kernel-headers.
+kernel-lts:
+kernel-lts: Like kernel-generic, it needs an initrd to boot.
+kernel-lts:
+kernel-lts: Homepage: https://www.kernel.org/
+kernel-lts:

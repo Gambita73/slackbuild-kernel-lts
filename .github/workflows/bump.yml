@@ -1,0 +1,41 @@
+name: Track 6.1.y releases
+
+# Checks kernel.org once a day. When a new 6.1.y is out (or MD5SUM is still
+# empty), it downloads the tarball, verifies its signature, updates the
+# .info and SlackBuild, and commits the change. Remove the "schedule" block
+# if you would rather bump by hand from the Actions tab.
+
+on:
+  schedule:
+    - cron: "17 7 * * *"
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - system/kernel-lts/kernel-lts.info
+
+permissions:
+  contents: write
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Update to the newest release of the series
+        env:
+          SERIES: "6.1"
+        run: ./bump-version.sh
+
+      - name: Commit
+        run: |
+          if git diff --quiet; then
+            echo "Nothing to commit."
+            exit 0
+          fi
+          VER=$(sed -n 's/^VERSION="\(.*\)"/\1/p' system/kernel-lts/kernel-lts.info)
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -am "system/kernel-lts: Updated for version $VER."
+          git push

@@ -1,0 +1,202 @@
+#!/bin/bash
+
+# Slackware build script for kernel-lts
+# Builds a Linux 6.1.y longterm (LTS) kernel for Slackware 15.0 that is
+# installed side by side with the stock 5.15 kernel.
+
+# Copyright 2026  Aleksandar Hristov, United States
+# All rights reserved.
+#
+# Redistribution and use of this script, with or without modification, is
+# permitted provided that the following conditions are met:
+#
+# 1. Redistributions of this script must retain the above copyright
+#    notice, this list of conditions and the following disclaimer.
+#
+#  THIS SOFTWARE IS PROVIDED BY THE AUTHOR "AS IS" AND ANY EXPRESS OR IMPLIED
+#  WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+#  MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO
+#  EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+#  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+#  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
+#  OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+#  WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+#  OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
+#  ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+# Build-time options (pass them in the environment, e.g.
+#   SOURCE=yes sbopkg -V kernel-lts/15.0 -i kernel-lts
+# or put them in options.sbopkg / the sbopkg options dialog):
+#
+#   CONFIG=/path/to/config  Use this kernel config as the starting point.
+#                           Default: the newest Slackware 5.15 "generic"
+#                           config found in /boot, else /proc/config.gz.
+#   SOURCE=yes              Also package the configured source tree in
+#                           /usr/src/linux-lts-$VERSION so out-of-tree
+#                           modules (nvidia, VirtualBox, ...) can be built.
+#                           Adds roughly 1.2 GB once installed.
+#   DEBUG=yes               Keep kernel debug info / BTF as the config has
+#                           it. Default: debug info is turned off, which
+#                           makes the build much faster and smaller.
+#   JOBS=N                  Parallel make jobs. Default: number of CPUs.
+
+cd $(dirname $0) ; CWD=$(pwd)
+
+PRGNAM=kernel-lts
+SRCNAM=linux
+VERSION=${VERSION:-6.1.192}
+BUILD=${BUILD:-1}
+TAG=${TAG:-_lts}
+PKGTYPE=${PKGTYPE:-tgz}
+
+CONFIG=${CONFIG:-}
+SOURCE=${SOURCE:-no}
+DEBUG=${DEBUG:-no}
+JOBS=${JOBS:-$(nproc 2>/dev/null || echo 2)}
+
+if [ -z "$ARCH" ]; then
+  case "$( uname -m )" in
+    i?86) ARCH=i586 ;;
+    arm*) ARCH=arm ;;
+       *) ARCH=$( uname -m ) ;;
+  esac
+fi
+
+if [ ! -z "${PRINT_PACKAGE_NAME}" ]; then
+  echo "$PRGNAM-$VERSION-$ARCH-$BUILD$TAG.$PKGTYPE"
+  exit 0
+fi
+
+TMP=${TMP:-/tmp/SBo}
+PKG=$TMP/package-$PRGNAM
+OUTPUT=${OUTPUT:-/tmp}
+
+case "$ARCH" in
+  i?86)   KARCH=x86 ;;
+  x86_64) KARCH=x86 ;;
+  *)
+    echo "ERROR: $PRGNAM only supports x86 (i586/i686) and x86_64 (got ARCH=$ARCH)."
+    exit 1
+    ;;
+esac
+
+set -e
+
+# ---------------------------------------------------------------------------
+# Pick the starting config.
+# ---------------------------------------------------------------------------
+find_slackware_config() {
+  local c
+  if [ "$ARCH" = "x86_64" ]; then
+    c=$(ls -1 /boot/config-generic-5.15.* 2>/dev/null | grep -v -- '-smp' | sort -V | tail -n 1)
+  else
+    c=$(ls -1 /boot/config-generic-smp-5.15.* 2>/dev/null | sort -V | tail -n 1)
+    [ -z "$c" ] && c=$(ls -1 /boot/config-generic-5.15.* 2>/dev/null | sort -V | tail -n 1)
+  fi
+  echo "$c"
+}
+
+if [ -z "$CONFIG" ]; then
+  CONFIG=$(find_slackware_config)
+fi
+if [ -z "$CONFIG" ] && [ -r /proc/config.gz ]; then
+  CONFIG=/proc/config.gz
+fi
+if [ -z "$CONFIG" ] || [ ! -r "$CONFIG" ]; then
+  cat <<EOF
+ERROR: no kernel config found to start from.
+
+Install Slackware's kernel-generic package (it provides
+/boot/config-generic-5.15.*), or point CONFIG= at a config file, e.g.:
+
+  CONFIG=/boot/config-generic-5.15.xxx.x64 sh $PRGNAM.SlackBuild
+EOF
+  exit 1
+fi
+echo "Using starting config: $CONFIG"
+
+# ---------------------------------------------------------------------------
+# Unpack and configure.
+# ---------------------------------------------------------------------------
+rm -rf $PKG
+mkdir -p $TMP $PKG $OUTPUT
+cd $TMP
+rm -rf $SRCNAM-$VERSION
+tar xvf $CWD/$SRCNAM-$VERSION.tar.xz
+cd $SRCNAM-$VERSION
+chown -R root:root .
+
+case "$CONFIG" in
+  *.gz) zcat "$CONFIG" > .config ;;
+  *)    cat  "$CONFIG" > .config ;;
+esac
+
+
+./scripts/config --disable LOCALVERSION_AUTO
+
+if [ "$DEBUG" != "yes" ]; then
+  # 6.1 turned DEBUG_INFO into a choice; select "none" and drop BTF so the
+  # build does not need pahole and does not produce gigabytes of DWARF.
+  ./scripts/config \
+    --disable DEBUG_INFO \
+    --disable DEBUG_INFO_DWARF_TOOLCHAIN_DEFAULT \
+    --disable DEBUG_INFO_DWARF4 \
+    --disable DEBUG_INFO_DWARF5 \
+    --disable DEBUG_INFO_BTF \
+    --enable  DEBUG_INFO_NONE
+fi
+
+# Fill in every option that is new since 5.15 with the upstream default.
+make ARCH=$KARCH olddefconfig
+
+KVER=$(make -s ARCH=$KARCH kernelrelease)
+echo "Kernel release will be: $KVER"
+
+# ---------------------------------------------------------------------------
+# Build.
+# ---------------------------------------------------------------------------
+make ARCH=$KARCH -j"$JOBS" bzImage modules
+
+# ---------------------------------------------------------------------------
+# Install into $PKG. File names carry an "-lts" marker so nothing from the
+# stock Slackware kernel packages is overwritten.
+# ---------------------------------------------------------------------------
+mkdir -p $PKG/boot
+cat arch/x86/boot/bzImage > $PKG/boot/vmlinuz-lts-$KVER
+cat System.map            > $PKG/boot/System.map-lts-$KVER
+cat .config               > $PKG/boot/config-lts-$KVER
+chmod 644 $PKG/boot/*
+
+make ARCH=$KARCH INSTALL_MOD_PATH=$PKG INSTALL_MOD_STRIP=1 modules_install
+
+
+rm -f $PKG/lib/modules/$KVER/build $PKG/lib/modules/$KVER/source
+
+if [ "$SOURCE" = "yes" ]; then
+  # Keep what is needed to build external modules, drop object files.
+  cp -a Module.symvers $TMP/Module.symvers.$PRGNAM
+  make ARCH=$KARCH clean
+  cp -a $TMP/Module.symvers.$PRGNAM Module.symvers
+  rm -f $TMP/Module.symvers.$PRGNAM
+  
+  rm -f certs/signing_key.pem
+  # Other architectures and the docs are not needed to build modules.
+  find arch -mindepth 1 -maxdepth 1 -type d ! -name x86 -exec rm -rf {} +
+  rm -rf Documentation
+  mkdir -p $PKG/usr/src
+  cp -a . $PKG/usr/src/linux-lts-$VERSION
+  ln -s /usr/src/linux-lts-$VERSION $PKG/lib/modules/$KVER/build
+  ln -s /usr/src/linux-lts-$VERSION $PKG/lib/modules/$KVER/source
+fi
+
+mkdir -p $PKG/usr/doc/$PRGNAM-$VERSION
+cp -a COPYING CREDITS MAINTAINERS README $PKG/usr/doc/$PRGNAM-$VERSION
+cat $CWD/$PRGNAM.SlackBuild > $PKG/usr/doc/$PRGNAM-$VERSION/$PRGNAM.SlackBuild
+cat $CWD/README > $PKG/usr/doc/$PRGNAM-$VERSION/README.SLACKWARE
+
+mkdir -p $PKG/install
+cat $CWD/slack-desc > $PKG/install/slack-desc
+sed "s/@KVER@/$KVER/g" $CWD/doinst.sh > $PKG/install/doinst.sh
+
+cd $PKG
+/sbin/makepkg -l y -c n $OUTPUT/$PRGNAM-$VERSION-$ARCH-$BUILD$TAG.$PKGTYPE
