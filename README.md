@@ -1,6 +1,6 @@
 # Linux 6.1 LTS for Slackware 15.0
 
-Slackware 15.0 ships the 5.15 kernel, which kernel.org will stop  supporting in
+Slackware 15.0 ships the 5.15 kernel, which kernel.org will stop supporting in
 December 2026. Linux 6.1 is a longterm branch that kernel.org projects to
 support until December 2027. This repository holds a SlackBuild that builds a
 6.1.y kernel from Slackware's own 5.15 config, laid out so that **sbopkg** can
@@ -35,7 +35,7 @@ sbopkg -V kernel-lts/15.0 -i kernel-lts
 ```
 
 Then add /boot/vmlinuz-lts with /boot/initrd-lts.gz to lilo, elilo or GRUB.
-system/kernel-lts/README` has the exact entries for each bootloader.
+`system/kernel-lts/README` has the exact entries for each bootloader.
 
 You can also pick the repository from sbopkg's menu under **Repository**.
 sbopkg -V kernel-lts/15.0 -c lists available updates for the kernel.
