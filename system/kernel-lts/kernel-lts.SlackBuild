@@ -44,7 +44,7 @@ cd $(dirname $0) ; CWD=$(pwd)
 
 PRGNAM=kernel-lts
 SRCNAM=linux
-VERSION=${VERSION:-6.1.192}
+VERSION=${VERSION:-6.1.193}
 BUILD=${BUILD:-1}
 TAG=${TAG:-_lts}
 PKGTYPE=${PKGTYPE:-tgz}
