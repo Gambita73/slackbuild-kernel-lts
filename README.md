@@ -28,6 +28,7 @@ wget -O /etc/sbopkg/repos.d/70-kernel-lts.repo \
 # 2. Sync it and build/install the kernel
 sbopkg -V kernel-lts/15.0 -r
 sbopkg -V kernel-lts/15.0 -i kernel-lts
+(Trick: alias sbolts='sbopkg -V kernel-lts/15.0')
 
 # 3. Make an initrd for it (replace 6.1.x with the installed version)
 /usr/share/mkinitrd/mkinitrd_command_generator.sh -k 6.1.x \
